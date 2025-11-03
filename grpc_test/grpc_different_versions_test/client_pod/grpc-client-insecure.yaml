@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: grpc-client-insecure
+  namespace: grpc-test
+spec:
+  restartPolicy: OnFailure
+  containers:
+    - name: grpc-client-insecure
+      image: dwilson2547/grpc-client-pod:1.1
+      imagePullPolicy: Always
+      command: ["tail"]
+      args: ["-f","/dev/null"]

@@ -1,0 +1,62 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: grpc-mtls-test-server-deployment
+  namespace: grpc-test
+  labels:
+    app: grpc-mtls-test-server
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: grpc-mtls-test-server
+  template:
+    metadata:
+      labels:
+        app: grpc-mtls-test-server
+    spec:
+      containers:
+        - name: grpc-mtls-test-server
+          image: dwilson2547/grpc-mtls-test:1.2
+          ports:
+          - containerPort: 50051
+          resources:
+            limits:
+              cpu: 1
+              memory: 1Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: grpc-mtls-test-server-entrypoint
+  namespace: grpc-test
+spec:
+  type: ClusterIP
+  selector:
+    app: grpc-mtls-test-server
+  ports:
+  - port: 443
+    protocol: TCP
+    targetPort: 50051
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ingress-grpc-mtls-test-server
+  namespace: grpc-test
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/ssl-passthrough: "true"
+spec:
+  rules:
+  - host: grpc-mtls-test-server.dev.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: grpc-mtls-test-server-entrypoint
+            port:
+              number: 443
+  ingressClassName: nginx

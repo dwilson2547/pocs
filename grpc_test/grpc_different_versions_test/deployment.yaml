@@ -1,0 +1,66 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: grpc-test-server-deployment
+  namespace: grpc-test
+  labels:
+    app: grpc-test-server
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: grpc-test-server
+  template:
+    metadata:
+      labels:
+        app: grpc-test-server
+    spec:
+      containers:
+        - name: grpc-test-server
+          image: dwilson2547/grpc-test:1.1
+          ports:
+          - containerPort: 50051
+          resources:
+            limits:
+              cpu: 1
+              memory: 1Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: grpc-test-server-entrypoint
+  namespace: grpc-test
+spec:
+  type: ClusterIP
+  selector:
+    app: grpc-test-server
+  ports:
+  - port: 80
+    protocol: TCP
+    targetPort: 50051
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ingress-grpc-test-server
+  namespace: grpc-test
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/backend-protocol: "GRPC"
+spec:
+  rules:
+  - host: grpc-test-server.dev.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: grpc-test-server-entrypoint
+            port:
+              number: 80
+  ingressClassName: nginx
+  tls:
+  - secretName: grpc-test-tls
+    hosts:
+      - grpc-test-server.dev.com

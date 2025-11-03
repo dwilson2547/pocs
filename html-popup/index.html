@@ -1,0 +1,29 @@
+<html>
+    <h1>Home page</h1>
+
+    <input id='txtHomePage' type="text">
+
+    <button onclick="openWindow()">Open Window</button>
+    <button onclick="closeWindow()">Close Window</button>
+    <script>
+        var mywindow;
+        var txt1 = document.getElementById('txtHomePage')
+        var txtPopUp;
+
+        function openWindow(){
+            window.popup = window.open('index2.html', 'TestWindow', 'location=no,width=400,height=400');
+            
+            window.popup.onload = function() {
+                txtBox = window.popup.document.getElementById('txtPopUp')
+                txtBox.addEventListener('keyup', function(e){
+                    console.log(txtBox.value);
+                    txt1.value = txtBox.value;
+                })
+            }
+        }
+        function closeWindow(){
+            window.popup.close()
+        }
+        
+    </script>
+</html>
