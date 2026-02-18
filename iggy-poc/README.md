@@ -5,8 +5,9 @@ A minimal working example of [Apache Iggy](https://iggy.apache.org) — a hyper-
 This POC demonstrates **simple pub/sub messaging** using:
 
 - An Iggy server running in Docker
-- A Python async **producer** that sends JSON messages via TCP
-- A Python async **consumer** that polls and prints those messages
+- Client implementations in **Python** and **Java**
+  - Python async producer and consumer
+  - Java blocking producer and consumer (Maven)
 
 ---
 
@@ -15,7 +16,8 @@ This POC demonstrates **simple pub/sub messaging** using:
 | Tool | Version | Notes |
 |------|---------|-------|
 | Docker + Docker Compose | Any recent | For the Iggy server |
-| Python | 3.10+ | For the clients |
+| Python | 3.10+ | For the Python clients |
+| Java + Maven | 17+ / 3.6+ | For the Java clients |
 
 ---
 
@@ -40,45 +42,46 @@ curl -s -H "Authorization: Bearer $TOKEN" http://localhost:3000/streams
 # → []  (empty — no streams yet, but server is up)
 ```
 
-### 2. Install Python dependencies
+### 2. Run the clients
+
+Choose **Python** or **Java** (or run both at the same time!):
+
+#### Option A: Python clients
 
 ```bash
-cd clients
+cd clients/python
 python3 -m venv .venv
 source .venv/bin/activate   # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
-```
 
-### 3. Run the producer
-
-In one terminal:
-
-```bash
-cd clients && source .venv/bin/activate
+# Terminal 1 - Producer
 python producer.py
-```
 
-You'll see one message sent per second:
-
-```text
-INFO  Sent message #1: {"id": 1, "text": "hello from producer", "ts": "..."}
-INFO  Sent message #2: ...
-```
-
-### 4. Run the consumer
-
-In a second terminal:
-
-```bash
-cd clients && source .venv/bin/activate
+# Terminal 2 - Consumer
 python consumer.py
 ```
 
-You'll see each message as it arrives:
+#### Option B: Java clients
+
+```bash
+cd clients/java
+mvn clean install
+
+# Terminal 1 - Producer
+mvn exec:java@run-producer
+
+# Terminal 2 - Consumer  
+mvn exec:java@run-consumer
+```
+
+You'll see messages flowing from producer to consumer:
 
 ```text
+# Producer
+INFO  Sent message #1: {"id": 1, "text": "hello from producer", "ts": "..."}
+
+# Consumer
 INFO  [offset=0] {"id": 1, "text": "hello from producer", "ts": "..."}
-INFO  [offset=1] {"id": 2, ...}
 ```
 
 ---
@@ -89,14 +92,20 @@ INFO  [offset=1] {"id": 2, ...}
 iggy-poc/
 ├── README.md
 ├── server/
-│   └── docker-compose.yml    # Iggy server (TCP:8090, HTTP+WS:3000)
+│   └── docker-compose.yml           # Iggy server (TCP:8090, HTTP+WS:3000)
 ├── clients/
-│   ├── requirements.txt      # iggy-py, loguru
-│   ├── producer.py           # Async producer — 1 msg/sec
-│   └── consumer.py           # Async consumer — polls every 500ms
+│   ├── python/
+│   │   ├── producer.py              # Python async producer
+│   │   ├── consumer.py              # Python async consumer
+│   │   └── requirements.txt
+│   └── java/
+│       ├── pom.xml                  # Maven configuration
+│       └── src/main/java/.../
+│           ├── Producer.java        # Java blocking producer
+│           └── Consumer.java        # Java blocking consumer
 └── docs/
-    ├── iggy-concepts.md      # Core concept reference (read this first)
-    └── architecture.md       # Server internals + SDK connection flow
+    ├── iggy-concepts.md             # Core concept reference
+    └── architecture.md              # Server internals + SDK flow
 ```
 
 ---
