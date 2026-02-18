@@ -2,9 +2,9 @@ const express = require('express');
 const mysql = require('mysql');
 
 const db = mysql.createConnection({
-    host: '192.168.0.30',
+    host: 'localhost',
     user: 'root',
-    password: 'dw31571102',
+    password: 'password',
     database: 'WebCrawl'
 });
 
