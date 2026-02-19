@@ -5,9 +5,11 @@ A minimal working example of [Apache Iggy](https://iggy.apache.org) — a hyper-
 This POC demonstrates **simple pub/sub messaging** using:
 
 - An Iggy server running in Docker
-- Client implementations in **Python** and **Java**
+- Client implementations in **Python**, **Java**, **Rust**, and **TypeScript**
   - Python async producer and consumer
   - Java blocking producer and consumer (Maven)
+  - Rust async producer and consumer (Cargo)
+  - TypeScript async producer and consumer (npm)
 
 ---
 
@@ -18,6 +20,8 @@ This POC demonstrates **simple pub/sub messaging** using:
 | Docker + Docker Compose | Any recent | For the Iggy server |
 | Python | 3.10+ | For the Python clients |
 | Java + Maven | 17+ / 3.6+ | For the Java clients |
+| Rust + Cargo | 1.70+ | For the Rust clients |
+| Node.js + npm | 18+ | For the TypeScript clients |
 
 ---
 
@@ -44,7 +48,7 @@ curl -s -H "Authorization: Bearer $TOKEN" http://localhost:3000/streams
 
 ### 2. Run the clients
 
-Choose **Python** or **Java** (or run both at the same time!):
+Choose **Python**, **Java**, **Rust**, or **TypeScript** (or run multiple at the same time!):
 
 #### Option A: Python clients
 
@@ -74,6 +78,32 @@ mvn exec:java@run-producer
 mvn exec:java@run-consumer
 ```
 
+#### Option C: Rust clients
+
+```bash
+cd clients/rust
+cargo build --release
+
+# Terminal 1 - Producer
+cargo run --bin producer
+
+# Terminal 2 - Consumer
+cargo run --bin consumer
+```
+
+#### Option D: TypeScript clients
+
+```bash
+cd clients/typescript
+npm install
+
+# Terminal 1 - Producer
+npm run producer
+
+# Terminal 2 - Consumer
+npm run consumer
+```
+
 You'll see messages flowing from producer to consumer:
 
 ```text
@@ -98,11 +128,21 @@ iggy-poc/
 │   │   ├── producer.py              # Python async producer
 │   │   ├── consumer.py              # Python async consumer
 │   │   └── requirements.txt
-│   └── java/
-│       ├── pom.xml                  # Maven configuration
-│       └── src/main/java/.../
-│           ├── Producer.java        # Java blocking producer
-│           └── Consumer.java        # Java blocking consumer
+│   ├── java/
+│   │   ├── pom.xml                  # Maven configuration
+│   │   └── src/main/java/.../
+│   │       ├── Producer.java        # Java blocking producer
+│   │       └── Consumer.java        # Java blocking consumer
+│   ├── rust/
+│   │   ├── Cargo.toml               # Cargo configuration
+│   │   └── src/
+│   │       ├── producer.rs          # Rust async producer
+│   │       └── consumer.rs          # Rust async consumer
+│   └── typescript/
+│       ├── package.json             # npm configuration
+│       └── src/
+│           ├── producer.ts          # TypeScript async producer
+│           └── consumer.ts          # TypeScript async consumer
 └── docs/
     ├── iggy-concepts.md             # Core concept reference
     └── architecture.md              # Server internals + SDK flow
@@ -168,4 +208,6 @@ cd server && docker compose down -v
 - [Apache Iggy homepage](https://iggy.apache.org)
 - [Official docs](https://iggy.apache.org/docs)
 - [Python SDK — iggy-py](https://github.com/iggy-rs/iggy-python-client)
+- [Rust SDK — iggy](https://crates.io/crates/iggy)
+- [TypeScript SDK — @iggy.rs/sdk](https://www.npmjs.com/package/@iggy.rs/sdk)
 - [Server source code](https://github.com/apache/iggy)
