@@ -1,15 +1,15 @@
 # TypeScript Clients for Iggy POC
 
-TypeScript producer and consumer using the official Apache Iggy TypeScript SDK with npm.
+TypeScript producer and consumer using the HTTP REST API with Node.js fetch.
 
 ## Prerequisites
 
-- **Node.js 18+** — Install from [nodejs.org](https://nodejs.org/)
+- **Node.js 18+** — Install from [nodejs.org](https://nodejs.org/) (fetch is built-in)
 - **npm** — Comes with Node.js installation
 
 ## Architecture
 
-This implementation uses the official Apache Iggy TypeScript SDK (`@iggy.rs/sdk` npm package) that connects via TCP on port 8090 (same as Python and Rust clients). The TypeScript SDK provides a type-safe interface to interact with Iggy and offers native performance through TCP protocol.
+Unlike the Python clients which use the native TCP SDK, this TypeScript implementation communicates directly with Iggy's HTTP REST API (port 3000). This approach was chosen for simplicity and compatibility, similar to the Java and Rust REST clients.
 
 ## Install Dependencies
 
@@ -58,22 +58,22 @@ Connected and logged in as iggy.
 
 ## How It Works
 
-Both clients use the official Apache Iggy TypeScript SDK to connect via TCP on port **8090** (same as Python and Rust clients).
+Both clients use HTTP REST API to connect to Iggy server on port **3000** (same as Java and Rust REST clients).
 
 ### Producer
 
-1. Connects to server via TCP and logs in
+1. Authenticates via POST `/users/login` to get a JWT token
 2. Creates stream and topic if they don't exist (idempotent)
-3. Sends JSON messages to partition 1 every 1 second
-4. Uses `client.message.send()` with Buffer payload
-5. Uses `partitioning.kind = "PartitionId"` to target specific partition
+3. Sends JSON messages to partition 0 every 1 second via POST `/streams/{stream}/topics/{topic}/messages`
+4. Messages are base64-encoded and wrapped in the required envelope format
 
 ### Consumer
 
-1. Connects to server via TCP and logs in
-2. Polls messages from partition 1 using next-offset polling strategy
-3. Auto-commits offsets after processing each batch
-4. Logs each message with its offset
+1. Authenticates via POST `/users/login` to get a JWT token
+2. Polls messages from partition 0 using GET `/streams/{stream}/topics/{topic}/messages`
+3. Uses offset-based polling strategy to track progress
+4. Auto-commits offsets after processing each batch
+5. Base64-decodes message payloads and logs them
 
 ## Message Format
 
@@ -103,45 +103,45 @@ typescript/
 
 ## Dependencies
 
-- **@iggy.rs/sdk** — Official Apache Iggy TypeScript SDK
 - **tsx** — TypeScript execution tool (dev dependency)
 - **typescript** — TypeScript compiler (dev dependency)
 
+Built-in Node.js 18+ features used:
+- **fetch API** — HTTP client for REST API communication
+- **Buffer** — Base64 encoding/decoding
+
 ## Key Features
 
-- **Native TCP protocol** — Direct binary protocol for high performance
+- **HTTP REST protocol** — Direct REST API communication on port 3000
 - **Type-safe API** — TypeScript provides compile-time type checking
 - **Async/await support** — Built on Promises for efficient concurrency
 - **Idempotent setup** — Stream and topic creation is safe to re-run
 - **Auto-commit** — Offsets are committed automatically after processing
+- **No external dependencies** — Uses only Node.js built-in APIs
 
 ## Comparison with Other Clients
 
 | Aspect | typescript/ (This) | rust/ | python/ | java-sdk/ | java/ (REST) |
 |--------|--------------------|-------|---------|-----------|--------------|
-| **Protocol** | TCP (port 8090) | TCP (port 8090) | TCP (port 8090) | TCP (port 8090) | HTTP REST (port 3000) |
-| **SDK** | Official TypeScript SDK | Official Rust SDK | iggy-py | Official Java SDK | Apache HttpClient |
-| **Performance** | Native | Native (fastest) | Native | Native | HTTP overhead |
+| **Protocol** | HTTP REST (port 3000) | HTTP REST (port 3000) | TCP (port 8090) | TCP (port 8090) | HTTP REST (port 3000) |
+| **SDK** | Built-in fetch | reqwest HTTP | iggy-py | Official Java SDK | Apache HttpClient |
+| **Performance** | HTTP overhead | HTTP overhead | Native | Native | HTTP overhead |
 | **Language** | TypeScript | Rust | Python | Java | Java |
-| **Use Case** | Production | Production recommended | Production | Production | HTTP-only environments |
+| **Use Case** | HTTP-only environments | HTTP-only environments | Production | Production | HTTP-only environments |
 
 ## Troubleshooting
 
 **Connection refused:**
 - Make sure the Iggy server is running: `cd ../../server && docker compose up -d`
-- Verify TCP port 8090 is accessible: `nc -zv localhost 8090`
+- Verify HTTP port 3000 is accessible: `nc -zv localhost 3000`
 
 **Module not found:**
 - Make sure you ran `npm install` first
 - Check Node.js version: `node --version` (should be 18+)
 
-**SDK not found:**
-- The SDK should be available on npm
-- Check https://www.npmjs.com/package/@iggy.rs/sdk
-
 ## References
 
 - [Apache Iggy Homepage](https://iggy.apache.org)
 - [Apache Iggy GitHub](https://github.com/apache/iggy)
-- [TypeScript SDK Documentation](https://iggy.apache.org/docs/sdk/node/intro/)
+- [HTTP REST API Documentation](https://iggy.apache.org/docs/apis/http)
 - [TypeScript SDK GitHub](https://github.com/iggy-rs/iggy-node-client)

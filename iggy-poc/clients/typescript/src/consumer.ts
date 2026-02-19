@@ -1,50 +1,83 @@
-import { Client } from "@iggy.rs/sdk";
-
+const API_BASE = "http://localhost:3000";
 const STREAM_NAME = "demo-stream";
 const TOPIC_NAME = "demo-topic";
-const PARTITION_ID = 1;
+const PARTITION_ID = 0;
 const POLL_INTERVAL_MS = 500;
 const MESSAGES_PER_BATCH = 10;
 
-async function main() {
-  console.log("Connecting to Iggy server...");
-  const client = new Client({
-    transport: "TCP",
-    options: { port: 8090, host: "127.0.0.1" },
-    credentials: { username: "iggy", password: "iggy" },
-  });
-
-  await client.connect();
-  console.log("Connected and logged in as iggy.");
-
-  await consumeMessages(client);
+interface LoginResponse {
+  access_token: {
+    token: string;
+  };
 }
 
-async function consumeMessages(client: Client) {
+interface PolledMessages {
+  messages?: Message[];
+}
+
+interface Message {
+  header: {
+    offset: number;
+  };
+  payload: string;
+}
+
+async function main() {
+  console.log("Connecting to Iggy server...");
+  console.log("Logging in...");
+  const authToken = await login();
+  console.log("Logged in as iggy.");
+
+  await consumeMessages(authToken);
+}
+
+async function login(): Promise<string> {
+  const response = await fetch(`${API_BASE}/users/login`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ username: "iggy", password: "iggy" }),
+  });
+
+  const data: LoginResponse = await response.json();
+  return data.access_token.token;
+}
+
+async function consumeMessages(authToken: string) {
   console.log(
     `Consuming from stream='${STREAM_NAME}' topic='${TOPIC_NAME}' partition=${PARTITION_ID}. Press Ctrl+C to stop.`
   );
 
+  let currentOffset = 0;
+
   while (true) {
     try {
-      const polled = await client.message.poll({
-        streamId: STREAM_NAME,
-        topicId: TOPIC_NAME,
-        partitionId: PARTITION_ID,
-        consumer: { kind: "Consumer", id: 1 },
-        pollingStrategy: { kind: "Next", value: 0n },
-        count: MESSAGES_PER_BATCH,
-        autoCommit: true,
+      const url = `${API_BASE}/streams/${STREAM_NAME}/topics/${TOPIC_NAME}/messages?consumer=1&partition_id=${PARTITION_ID}&strategy=offset&value=${currentOffset}&count=${MESSAGES_PER_BATCH}&auto_commit=true`;
+
+      const response = await fetch(url, {
+        headers: { Authorization: `Bearer ${authToken}` },
       });
 
-      if (!polled.messages || polled.messages.length === 0) {
-        // No new messages — wait before polling again
-        await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
-        continue;
-      }
+      if (response.ok) {
+        const text = await response.text();
+        if (text.trim()) {
+          const polled: PolledMessages = JSON.parse(text);
 
-      for (const msg of polled.messages) {
-        handleMessage(msg);
+          if (!polled.messages || polled.messages.length === 0) {
+            await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
+            continue;
+          }
+
+          for (const msg of polled.messages) {
+            const payload = decodePayload(msg.payload);
+            console.log(`[offset=${msg.header.offset}] ${payload}`);
+            currentOffset = msg.header.offset + 1;
+          }
+        } else {
+          await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
+        }
+      } else {
+        console.error(`Error while consuming: HTTP ${response.status}`);
+        await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
       }
 
       await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
@@ -55,9 +88,14 @@ async function consumeMessages(client: Client) {
   }
 }
 
-function handleMessage(message: any) {
-  const payload = message.payload.toString("utf-8");
-  console.log(`[offset=${message.offset}] ${payload}`);
+function decodePayload(payload: string): string {
+  // Payload is base64-encoded
+  try {
+    const decoded = Buffer.from(payload, "base64").toString("utf-8");
+    return decoded;
+  } catch {
+    return payload;
+  }
 }
 
 main().catch((error) => {

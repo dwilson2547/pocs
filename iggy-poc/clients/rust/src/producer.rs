@@ -1,22 +1,13 @@
-use iggy::client::{Client, UserClient, StreamClient, TopicClient, MessageClient};
-use iggy::client_provider;
-use iggy::client_provider::ClientProviderConfig;
-use iggy::clients::client::IggyClient;
-use iggy::identifier::Identifier;
-use iggy::messages::send_messages::{Message, Partitioning, SendMessages};
-use iggy::models::messages::PolledMessage;
-use iggy::tcp::client::TcpClient;
-use iggy::tcp::config::TcpClientConfig;
+use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use std::error::Error;
-use std::str::FromStr;
 use std::time::Duration;
-use tracing::{info, error};
-use tracing_subscriber;
+use base64::Engine;
 
+const API_BASE: &str = "http://localhost:3000";
 const STREAM_NAME: &str = "demo-stream";
 const TOPIC_NAME: &str = "demo-topic";
-const PARTITION_ID: u32 = 1;
+const PARTITION_ID: u32 = 0;
 const SEND_INTERVAL_SECS: u64 = 1;
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -26,74 +17,120 @@ struct MessagePayload {
     ts: String,
 }
 
+#[derive(Serialize, Deserialize)]
+struct LoginRequest {
+    username: String,
+    password: String,
+}
+
+#[derive(Serialize, Deserialize)]
+struct LoginResponse {
+    access_token: AccessToken,
+}
+
+#[derive(Serialize, Deserialize)]
+struct AccessToken {
+    token: String,
+}
+
+#[derive(Serialize, Deserialize)]
+struct StreamResponse {
+    id: u32,
+}
+
+#[derive(Serialize, Deserialize)]
+struct TopicResponse {
+    id: u32,
+}
+
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
-    tracing_subscriber::fmt::init();
+    let client = Client::new();
 
-    info!("Connecting to Iggy server...");
-    let client = IggyClient::create(
-        TcpClient::create(TcpClientConfig {
-            server_address: "127.0.0.1:8090".to_string(),
-            ..Default::default()
-        })?,
-        None,
-        None,
-    )?;
+    println!("Connecting to Iggy server...");
+    println!("Logging in...");
+    let auth_token = login(&client).await?;
+    println!("Logged in as iggy.");
 
-    client.connect().await?;
-    info!("Connected. Logging in...");
-    client.login_user("iggy", "iggy").await?;
-    info!("Logged in as iggy.");
-
-    init_system(&client).await?;
-    produce_messages(&client).await?;
+    init_system(&client, &auth_token).await?;
+    produce_messages(&client, &auth_token).await?;
 
     Ok(())
 }
 
-async fn init_system(client: &IggyClient) -> Result<(), Box<dyn Error>> {
-    // Create stream if it doesn't exist
-    match client.get_stream(&Identifier::from_str(STREAM_NAME)?).await {
-        Ok(stream) => {
-            info!("Stream '{}' already exists (id={}).", STREAM_NAME, stream.id);
-        }
-        Err(_) => {
-            client
-                .create_stream(STREAM_NAME, None)
-                .await?;
-            info!("Stream '{}' created.", STREAM_NAME);
-        }
+async fn login(client: &Client) -> Result<String, Box<dyn Error>> {
+    let login_req = LoginRequest {
+        username: "iggy".to_string(),
+        password: "iggy".to_string(),
+    };
+
+    let response = client
+        .post(format!("{}/users/login", API_BASE))
+        .json(&login_req)
+        .send()
+        .await?;
+
+    let login_response: LoginResponse = response.json().await?;
+    Ok(login_response.access_token.token)
+}
+
+async fn init_system(client: &Client, auth_token: &str) -> Result<(), Box<dyn Error>> {
+    // Check if stream exists
+    let response = client
+        .get(format!("{}/streams/{}", API_BASE, STREAM_NAME))
+        .bearer_auth(auth_token)
+        .send()
+        .await?;
+
+    if response.status().is_success() {
+        let stream: StreamResponse = response.json().await?;
+        println!("Stream '{}' already exists (id={}).", STREAM_NAME, stream.id);
+    } else {
+        // Create stream
+        let stream_json = serde_json::json!({ "name": STREAM_NAME });
+        client
+            .post(format!("{}/streams", API_BASE))
+            .bearer_auth(auth_token)
+            .json(&stream_json)
+            .send()
+            .await?;
+        println!("Stream '{}' created.", STREAM_NAME);
     }
 
-    // Create topic if it doesn't exist
-    match client
-        .get_topic(&Identifier::from_str(STREAM_NAME)?, &Identifier::from_str(TOPIC_NAME)?)
-        .await
-    {
-        Ok(topic) => {
-            info!("Topic '{}' already exists (id={}).", TOPIC_NAME, topic.id);
-        }
-        Err(_) => {
-            client
-                .create_topic(
-                    &Identifier::from_str(STREAM_NAME)?,
-                    TOPIC_NAME,
-                    1,
-                    Default::default(),
-                    None,
-                    None,
-                    None,
-                )
-                .await?;
-            info!("Topic '{}' created.", TOPIC_NAME);
-        }
+    // Check if topic exists
+    let response = client
+        .get(format!("{}/streams/{}/topics/{}", API_BASE, STREAM_NAME, TOPIC_NAME))
+        .bearer_auth(auth_token)
+        .send()
+        .await?;
+
+    if response.status().is_success() {
+        let topic: TopicResponse = response.json().await?;
+        println!("Topic '{}' already exists (id={}).", TOPIC_NAME, topic.id);
+    } else {
+        // Create topic
+        let topic_json = serde_json::json!({
+            "name": TOPIC_NAME,
+            "partitions_count": 1,
+            "compression_algorithm": "none",
+            "message_expiry": 0,
+            "max_topic_size": 0,
+            "replication_factor": 1
+        });
+        client
+            .post(format!("{}/streams/{}/topics", API_BASE, STREAM_NAME))
+            .bearer_auth(auth_token)
+            .json(&topic_json)
+            .send()
+            .await?;
+        println!("Topic '{}' created.", TOPIC_NAME);
     }
 
     Ok(())
 }
 
-async fn produce_messages(client: &IggyClient) -> Result<(), Box<dyn Error>> {
-    info!(
+async fn produce_messages(client: &Client, auth_token: &str) -> Result<(), Box<dyn Error>> {
+    println!(
         "Producing to stream='{}' topic='{}' partition={} every {}s. Press Ctrl+C to stop.",
         STREAM_NAME, TOPIC_NAME, PARTITION_ID, SEND_INTERVAL_SECS
     );
@@ -109,22 +146,39 @@ async fn produce_messages(client: &IggyClient) -> Result<(), Box<dyn Error>> {
         };
 
         let json_payload = serde_json::to_string(&payload)?;
-        let message = Message::from_str(&json_payload)?;
+        let payload_b64 = base64::engine::general_purpose::STANDARD.encode(json_payload.as_bytes());
 
-        let mut send_messages = SendMessages {
-            stream_id: Identifier::from_str(STREAM_NAME)?,
-            topic_id: Identifier::from_str(TOPIC_NAME)?,
-            partitioning: Partitioning::partition_id(PARTITION_ID),
-            messages: vec![message],
-        };
+        // Encode partition ID as little-endian 4 bytes
+        let partition_bytes = PARTITION_ID.to_le_bytes();
+        let partition_b64 = base64::engine::general_purpose::STANDARD.encode(&partition_bytes);
 
-        match client.send_messages(&mut send_messages).await {
-            Ok(_) => {
-                info!("Sent message #{}: {}", message_id, json_payload);
-            }
-            Err(e) => {
-                error!("Failed to send message #{}: {}", message_id, e);
-            }
+        // Create message envelope
+        let envelope = serde_json::json!({
+            "partitioning": {
+                "kind": "partition_id",
+                "value": partition_b64
+            },
+            "messages": [
+                {
+                    "payload": payload_b64
+                }
+            ]
+        });
+
+        let url = format!("{}/streams/{}/topics/{}/messages", API_BASE, STREAM_NAME, TOPIC_NAME);
+        let response = client
+            .post(&url)
+            .bearer_auth(auth_token)
+            .json(&envelope)
+            .send()
+            .await?;
+
+        if response.status().is_success() {
+            println!("Sent message #{}: {}", message_id, json_payload);
+        } else {
+            let status = response.status();
+            let body = response.text().await?;
+            eprintln!("Failed to send message #{}: HTTP {} - {}", message_id, status, body);
         }
 
         tokio::time::sleep(Duration::from_secs(SEND_INTERVAL_SECS)).await;
