@@ -9,7 +9,7 @@ Rust producer and consumer using the HTTP REST API with reqwest and Cargo.
 
 ## Architecture
 
-Unlike the Python and TypeScript clients which use the native TCP SDK, this Rust implementation communicates directly with Iggy's HTTP REST API (port 3000). This approach was chosen to demonstrate an alternative connection method and avoid SDK version compatibility issues, similar to the Java REST client.
+Unlike the Python clients which use the native TCP SDK, this Rust implementation communicates directly with Iggy's HTTP REST API (port 3000). This approach was chosen to demonstrate an alternative connection method and avoid SDK version compatibility issues, similar to the Java REST client.
 
 ## Build
 
@@ -66,13 +66,13 @@ Both clients use HTTP REST API to connect to Iggy server on port **3000** (same 
 
 1. Authenticates via POST `/users/login` to get a JWT token
 2. Creates stream and topic if they don't exist (idempotent)
-3. Sends JSON messages to partition 1 every 1 second via POST `/streams/{stream}/topics/{topic}/messages`
+3. Sends JSON messages to partition 0 every 1 second via POST `/streams/{stream}/topics/{topic}/messages`
 4. Messages are base64-encoded and wrapped in the required envelope format
 
 ### Consumer
 
 1. Authenticates via POST `/users/login` to get a JWT token
-2. Polls messages from partition 1 using GET `/streams/{stream}/topics/{topic}/messages`
+2. Polls messages from partition 0 using GET `/streams/{stream}/topics/{topic}/messages`
 3. Uses offset-based polling strategy to track progress
 4. Auto-commits offsets after processing each batch
 5. Base64-decodes message payloads and logs them
@@ -122,11 +122,11 @@ rust/
 
 | Aspect | rust/ (This) | python/ | typescript/ | java-sdk/ | java/ (REST) |
 |--------|--------------|---------|-------------|-----------|--------------|
-| **Protocol** | HTTP REST (port 3000) | TCP (port 8090) | TCP (port 8090) | TCP (port 8090) | HTTP REST (port 3000) |
-| **SDK** | reqwest HTTP | iggy-py | Official TypeScript SDK | Official Java SDK | Apache HttpClient |
-| **Performance** | HTTP overhead | Native | Native | Native | HTTP overhead |
+| **Protocol** | HTTP REST (port 3000) | TCP (port 8090) | HTTP REST (port 3000) | TCP (port 8090) | HTTP REST (port 3000) |
+| **SDK** | reqwest HTTP | iggy-py | Built-in fetch | Official Java SDK | Apache HttpClient |
+| **Performance** | HTTP overhead | Native | HTTP overhead | Native | HTTP overhead |
 | **Language** | Rust | Python | TypeScript | Java | Java |
-| **Use Case** | HTTP-only environments | Production | Production | Production | HTTP-only environments |
+| **Use Case** | HTTP-only environments | Production | HTTP-only environments | Production | HTTP-only environments |
 
 ## Troubleshooting
 

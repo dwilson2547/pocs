@@ -9,7 +9,7 @@ TypeScript producer and consumer using the HTTP REST API with Node.js fetch.
 
 ## Architecture
 
-Unlike the Python clients which use the native TCP SDK, this TypeScript implementation communicates directly with Iggy's HTTP REST API (port 3000). This approach was chosen for simplicity and compatibility, similar to the Java and Rust REST clients.
+This TypeScript implementation communicates directly with Iggy's HTTP REST API (port 3000), similar to the Java and Rust REST clients. This approach was chosen for simplicity and compatibility, using only Node.js built-in APIs without external SDK dependencies.
 
 ## Install Dependencies
 
@@ -97,8 +97,8 @@ typescript/
 ├── tsconfig.json           # TypeScript configuration
 ├── README.md               # This file
 └── src/
-    ├── producer.ts         # TCP producer using TypeScript SDK
-    └── consumer.ts         # TCP consumer using TypeScript SDK
+    ├── producer.ts         # HTTP REST producer
+    └── consumer.ts         # HTTP REST consumer
 ```
 
 ## Dependencies
