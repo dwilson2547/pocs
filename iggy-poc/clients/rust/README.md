@@ -1,6 +1,6 @@
 # Rust Clients for Iggy POC
 
-Rust producer and consumer using the HTTP REST API with reqwest and Cargo.
+Rust producer and consumer using the official Apache Iggy Rust SDK with Cargo.
 
 ## Prerequisites
 
@@ -9,7 +9,7 @@ Rust producer and consumer using the HTTP REST API with reqwest and Cargo.
 
 ## Architecture
 
-Unlike the Python clients which use the native TCP SDK, this Rust implementation communicates directly with Iggy's HTTP REST API (port 3000). This approach was chosen to demonstrate an alternative connection method and avoid SDK version compatibility issues, similar to the Java REST client.
+This implementation uses the official Apache Iggy Rust SDK (`iggy` crate) that connects via **TCP on port 8090** (same as Python clients). The Rust SDK is the reference implementation maintained as part of the main Apache Iggy project and offers the best performance and feature completeness.
 
 ## Build
 
@@ -32,13 +32,12 @@ cargo run --bin producer
 You'll see output like:
 
 ```text
-Connecting to Iggy server...
-Logging in...
-Logged in as iggy.
-Stream 'demo-stream' already exists (id=1).
-Topic 'demo-topic' already exists (id=1).
-Producing to stream='demo-stream' topic='demo-topic' partition=0 every 1s. Press Ctrl+C to stop.
-Sent message #1: {"id":1,"text":"hello from Rust producer","ts":"2024-01-15T01:23:45.678Z"}
+INFO  Connecting to Iggy server...
+INFO  Connected. Logging in...
+INFO  Logged in as iggy.
+INFO  Stream 'demo-stream' created or already exists.
+INFO  Topic 'demo-topic' created or already exists.
+INFO  Sent message #1: {"id":1,"text":"hello from Rust producer","ts":"2024-01-15T01:23:45.678Z"}
 ```
 
 ## Run the Consumer
@@ -53,31 +52,30 @@ cargo run --bin consumer
 You'll see output like:
 
 ```text
-Connecting to Iggy server...
-Logging in...
-Logged in as iggy.
-Consuming from stream='demo-stream' topic='demo-topic' partition=0. Press Ctrl+C to stop.
-[offset=0] {"id":1,"text":"hello from Rust producer","ts":"2024-01-15T01:23:45.678Z"}
+INFO  Connecting to Iggy server...
+INFO  Connected. Logging in...
+INFO  Logged in as iggy.
+INFO  [offset=0] {"id":1,"text":"hello from Rust producer","ts":"2024-01-15T01:23:45.678Z"}
 ```
 
 ## How It Works
 
-Both clients use HTTP REST API to connect to Iggy server on port **3000** (same as Java REST clients).
+Both clients use the official Apache Iggy Rust SDK to connect via **TCP on port 8090** (same as Python clients).
 
 ### Producer
 
-1. Authenticates via POST `/users/login` to get a JWT token
-2. Creates stream and topic if they don't exist (idempotent)
-3. Sends JSON messages to partition 0 every 1 second via POST `/streams/{stream}/topics/{topic}/messages`
-4. Messages are base64-encoded and wrapped in the required envelope format
+1. Connects to server via TCP using connection string format
+2. Authenticates with username/password
+3. Creates stream and topic if they don't exist (idempotent)
+4. Sends JSON messages to partition 1 every 1 second
+5. Uses `send_message()` API for message production
 
 ### Consumer
 
-1. Authenticates via POST `/users/login` to get a JWT token
-2. Polls messages from partition 0 using GET `/streams/{stream}/topics/{topic}/messages`
-3. Uses offset-based polling strategy to track progress
-4. Auto-commits offsets after processing each batch
-5. Base64-decodes message payloads and logs them
+1. Connects to server via TCP using connection string format
+2. Authenticates with username/password
+3. Polls messages from partition 1 using next-offset polling strategy
+4. Logs each message with its offset
 
 ## Message Format
 
@@ -100,50 +98,54 @@ rust/
 ├── Cargo.toml              # Cargo configuration with dependencies
 ├── README.md               # This file
 └── src/
-    ├── producer.rs         # HTTP REST producer
-    └── consumer.rs         # HTTP REST consumer
+    ├── producer.rs         # TCP producer using Rust SDK
+    └── consumer.rs         # TCP consumer using Rust SDK
 ```
 
 ## Dependencies
 
-- **reqwest** — HTTP client for REST API communication
+- **iggy 0.8** — Official Apache Iggy Rust SDK
 - **tokio** — Async runtime
 - **serde + serde_json** — JSON serialization
 - **chrono** — Timestamp handling
-- **base64** — Base64 encoding/decoding
+- **tracing + tracing-subscriber** — Logging
 
 ## Key Features
 
-- **HTTP REST protocol** — Direct REST API communication on port 3000
+- **Native TCP protocol** — Direct binary protocol for maximum performance
 - **Type-safe API** — Rust's type system ensures correctness
 - **Async/await support** — Built on tokio for efficient concurrency
 - **Idempotent setup** — Stream and topic creation is safe to re-run
-- **Auto-commit** — Offsets are committed automatically after processing
+- **Connection string format** — Simple configuration via URI
 
 ## Comparison with Other Clients
 
 | Aspect | rust/ (This) | python/ | typescript/ | java-sdk/ | java/ (REST) |
 |--------|--------------|---------|-------------|-----------|--------------|
-| **Protocol** | HTTP REST (port 3000) | TCP (port 8090) | HTTP REST (port 3000) | TCP (port 8090) | HTTP REST (port 3000) |
-| **SDK** | reqwest HTTP | iggy-py | Built-in fetch | Official Java SDK | Apache HttpClient |
-| **Performance** | HTTP overhead | Native | HTTP overhead | Native | HTTP overhead |
+| **Protocol** | TCP (port 8090) | TCP (port 8090) | TCP (port 8090) | TCP (port 8090) | HTTP REST (port 3000) |
+| **SDK** | Official Rust SDK | iggy-py | Official TypeScript SDK | Official Java SDK | Apache HttpClient |
+| **Performance** | Native (fastest) | Native | Native | Native | HTTP overhead |
 | **Language** | Rust | Python | TypeScript | Java | Java |
-| **Use Case** | HTTP-only environments | Production | HTTP-only environments | Production | HTTP-only environments |
+| **Use Case** | Production recommended | Production | Production | Production | HTTP-only environments |
 
 ## Troubleshooting
 
 **Connection refused:**
 - Make sure the Iggy server is running: `cd ../../server && docker compose up -d`
-- Verify HTTP port 3000 is accessible: `nc -zv localhost 3000`
+- Verify TCP port 8090 is accessible: `nc -zv localhost 8090`
 
 **Build errors:**
 - Ensure you have Rust installed: `rustc --version`
 - Update Rust if needed: `rustup update`
 - Clear Cargo cache if needed: `cargo clean`
 
+**SDK not found:**
+- The SDK version 0.8 should be available on crates.io
+- Check https://crates.io/crates/iggy
+
 ## References
 
 - [Apache Iggy Homepage](https://iggy.apache.org)
 - [Apache Iggy GitHub](https://github.com/apache/iggy)
 - [Rust SDK Documentation](https://docs.rs/iggy/latest/iggy/)
-- [HTTP REST API Documentation](https://iggy.apache.org/docs/apis/http)
+- [Rust Examples](https://github.com/apache/iggy/tree/master/examples/rust)

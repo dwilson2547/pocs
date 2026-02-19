@@ -12,9 +12,10 @@ name = "consumer"
 path = "src/consumer.rs"
 
 [dependencies]
-reqwest = { version = "0.12", features = ["json"] }
+iggy = "0.8"
 tokio = { version = "1", features = ["full"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 chrono = { version = "0.4", features = ["serde"] }
-base64 = "0.22"
+tracing = "0.1"
+tracing-subscriber = "0.3"

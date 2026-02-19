@@ -1,137 +1,82 @@
-use reqwest::Client;
-use serde::{Deserialize, Serialize};
+use iggy::clients::client::IggyClient;
+use iggy::tcp::client::TcpClient;
+use iggy::tcp::config::TcpClientConfig;
+use iggy::client::{Client, MessageClient, UserClient};
+use iggy::consumer::Consumer;
+use iggy::identifier::Identifier;
+use iggy::messages::poll_messages::{PollMessages, PollingStrategy};
 use std::error::Error;
+use std::str::FromStr;
 use std::time::Duration;
-use base64::Engine;
+use tracing::{info, debug, error};
+use tracing_subscriber;
 
-const API_BASE: &str = "http://localhost:3000";
 const STREAM_NAME: &str = "demo-stream";
 const TOPIC_NAME: &str = "demo-topic";
-const PARTITION_ID: u32 = 0;
+const PARTITION_ID: u32 = 1;
 const POLL_INTERVAL_MS: u64 = 500;
 const MESSAGES_PER_BATCH: u32 = 10;
 
-#[derive(Serialize, Deserialize)]
-struct LoginRequest {
-    username: String,
-    password: String,
-}
-
-#[derive(Serialize, Deserialize)]
-struct LoginResponse {
-    access_token: AccessToken,
-}
-
-#[derive(Serialize, Deserialize)]
-struct AccessToken {
-    token: String,
-}
-
-#[derive(Serialize, Deserialize)]
-struct PolledMessages {
-    messages: Option<Vec<Message>>,
-}
-
-#[derive(Serialize, Deserialize)]
-struct Message {
-    header: MessageHeader,
-    payload: String,
-}
-
-#[derive(Serialize, Deserialize)]
-struct MessageHeader {
-    offset: u64,
-}
-
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
-    let client = Client::new();
+    tracing_subscriber::fmt::init();
 
-    println!("Connecting to Iggy server...");
-    println!("Logging in...");
-    let auth_token = login(&client).await?;
-    println!("Logged in as iggy.");
+    info!("Connecting to Iggy server...");
+    let client = IggyClient::create(
+        TcpClient::create(TcpClientConfig {
+            server_address: "127.0.0.1:8090".to_string(),
+            ..Default::default()
+        })?,
+        None,
+        None,
+    )?;
+    
+    client.connect().await?;
+    info!("Connected. Logging in...");
+    client.login_user("iggy", "iggy").await?;
+    info!("Logged in as iggy.");
 
-    consume_messages(&client, &auth_token).await?;
+    consume_messages(&client).await?;
 
     Ok(())
 }
 
-async fn login(client: &Client) -> Result<String, Box<dyn Error>> {
-    let login_req = LoginRequest {
-        username: "iggy".to_string(),
-        password: "iggy".to_string(),
-    };
-
-    let response = client
-        .post(format!("{}/users/login", API_BASE))
-        .json(&login_req)
-        .send()
-        .await?;
-
-    let login_response: LoginResponse = response.json().await?;
-    Ok(login_response.access_token.token)
-}
-
-async fn consume_messages(client: &Client, auth_token: &str) -> Result<(), Box<dyn Error>> {
-    println!(
+async fn consume_messages(client: &IggyClient) -> Result<(), Box<dyn Error>> {
+    info!(
         "Consuming from stream='{}' topic='{}' partition={}. Press Ctrl+C to stop.",
         STREAM_NAME, TOPIC_NAME, PARTITION_ID
     );
 
-    let mut current_offset = 0u64;
-
     loop {
-        let url = format!(
-            "{}/streams/{}/topics/{}/messages?consumer=1&partition_id={}&strategy=offset&value={}&count={}&auto_commit=true",
-            API_BASE, STREAM_NAME, TOPIC_NAME, PARTITION_ID, current_offset, MESSAGES_PER_BATCH
-        );
+        let poll_messages = PollMessages {
+            consumer: Consumer::new(Identifier::from_str("1")?),
+            stream_id: Identifier::from_str(STREAM_NAME)?,
+            topic_id: Identifier::from_str(TOPIC_NAME)?,
+            partition_id: Some(PARTITION_ID),
+            strategy: PollingStrategy::next(),
+            count: MESSAGES_PER_BATCH,
+            auto_commit: true,
+        };
 
-        let response = client
-            .get(&url)
-            .bearer_auth(auth_token)
-            .send()
-            .await?;
-
-        if response.status().is_success() {
-            let text = response.text().await?;
-            if !text.trim().is_empty() {
-                match serde_json::from_str::<PolledMessages>(&text) {
-                    Ok(polled) => {
-                        if let Some(messages) = polled.messages {
-                            if messages.is_empty() {
-                                tokio::time::sleep(Duration::from_millis(POLL_INTERVAL_MS)).await;
-                                continue;
-                            }
-
-                            for msg in messages {
-                                let payload = decode_payload(&msg.payload);
-                                println!("[offset={}] {}", msg.header.offset, payload);
-                                current_offset = msg.header.offset + 1;
-                            }
-                        } else {
-                            tokio::time::sleep(Duration::from_millis(POLL_INTERVAL_MS)).await;
-                        }
-                    }
-                    Err(e) => {
-                        eprintln!("Error parsing response: {} - Response: {}", e, text);
-                        tokio::time::sleep(Duration::from_millis(POLL_INTERVAL_MS)).await;
-                    }
+        match client.poll_messages(&poll_messages).await {
+            Ok(polled) => {
+                if polled.messages.is_empty() {
+                    debug!("No new messages — waiting...");
+                    tokio::time::sleep(Duration::from_millis(POLL_INTERVAL_MS)).await;
+                    continue;
                 }
-            } else {
+
+                for msg in &polled.messages {
+                    let payload = String::from_utf8_lossy(&msg.payload);
+                    info!("[offset={}] {}", msg.offset, payload);
+                }
+
                 tokio::time::sleep(Duration::from_millis(POLL_INTERVAL_MS)).await;
             }
-        } else {
-            eprintln!("Error while consuming: HTTP {}", response.status());
-            tokio::time::sleep(Duration::from_millis(POLL_INTERVAL_MS)).await;
+            Err(e) => {
+                error!("Error while consuming — retrying: {}", e);
+                tokio::time::sleep(Duration::from_millis(POLL_INTERVAL_MS)).await;
+            }
         }
     }
-}
-
-fn decode_payload(payload: &str) -> String {
-    // Payload is base64-encoded
-    if let Ok(decoded) = base64::engine::general_purpose::STANDARD.decode(payload) {
-        return String::from_utf8_lossy(&decoded).to_string();
-    }
-    payload.to_string()
 }

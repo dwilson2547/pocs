@@ -11,9 +11,11 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@iggy.rs/sdk": "^1.0.6"
   },
   "devDependencies": {
     "tsx": "^4.7.0",
     "typescript": "^5.3.0"
   }
 }
+
