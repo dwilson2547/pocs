@@ -32,12 +32,13 @@ cargo run --bin producer
 You'll see output like:
 
 ```text
-2024-01-15T01:23:45.123Z INFO  Connecting to Iggy server...
-2024-01-15T01:23:45.234Z INFO  Connected. Logging in...
-2024-01-15T01:23:45.345Z INFO  Logged in as iggy.
-2024-01-15T01:23:45.456Z INFO  Stream 'demo-stream' already exists (id=1).
-2024-01-15T01:23:45.567Z INFO  Topic 'demo-topic' already exists (id=1).
-2024-01-15T01:23:45.678Z INFO  Sent message #1: {"id":1,"text":"hello from Rust producer","ts":"2024-01-15T01:23:45.678Z"}
+Connecting to Iggy server...
+Logging in...
+Logged in as iggy.
+Stream 'demo-stream' already exists (id=1).
+Topic 'demo-topic' already exists (id=1).
+Producing to stream='demo-stream' topic='demo-topic' partition=0 every 1s. Press Ctrl+C to stop.
+Sent message #1: {"id":1,"text":"hello from Rust producer","ts":"2024-01-15T01:23:45.678Z"}
 ```
 
 ## Run the Consumer
@@ -52,10 +53,11 @@ cargo run --bin consumer
 You'll see output like:
 
 ```text
-2024-01-15T01:23:50.123Z INFO  Connecting to Iggy server...
-2024-01-15T01:23:50.234Z INFO  Connected. Logging in...
-2024-01-15T01:23:50.345Z INFO  Logged in as iggy.
-2024-01-15T01:23:50.456Z INFO  [offset=0] {"id":1,"text":"hello from Rust producer","ts":"2024-01-15T01:23:45.678Z"}
+Connecting to Iggy server...
+Logging in...
+Logged in as iggy.
+Consuming from stream='demo-stream' topic='demo-topic' partition=0. Press Ctrl+C to stop.
+[offset=0] {"id":1,"text":"hello from Rust producer","ts":"2024-01-15T01:23:45.678Z"}
 ```
 
 ## How It Works

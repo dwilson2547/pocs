@@ -18,7 +18,7 @@ cd clients/typescript
 npm install
 ```
 
-This will download the Iggy SDK and all dependencies.
+This will download development dependencies (tsx and TypeScript compiler).
 
 ## Run the Producer
 
@@ -33,7 +33,8 @@ You'll see output like:
 
 ```text
 Connecting to Iggy server...
-Connected and logged in as iggy.
+Logging in...
+Logged in as iggy.
 Stream 'demo-stream' already exists (id=1).
 Topic 'demo-topic' already exists (id=1).
 Sent message #1: {"id":1,"text":"hello from TypeScript producer","ts":"2024-01-15T01:23:45.678Z"}
@@ -52,7 +53,8 @@ You'll see output like:
 
 ```text
 Connecting to Iggy server...
-Connected and logged in as iggy.
+Logging in...
+Logged in as iggy.
 [offset=0] {"id":1,"text":"hello from TypeScript producer","ts":"2024-01-15T01:23:45.678Z"}
 ```
 
