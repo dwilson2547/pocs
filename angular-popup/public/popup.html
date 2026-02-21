@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Angular Popup – Control Panel</title>
+  <style>
+    body {
+      font-family: Roboto, 'Helvetica Neue', sans-serif;
+      background: #1a202c;
+      color: #e2e8f0;
+      padding: 1.5rem;
+      margin: 0;
+    }
+    h2 { color: #90cdf4; margin-top: 0; }
+    .card {
+      background: #2d3748;
+      border-radius: 8px;
+      padding: 1.25rem;
+      box-shadow: 0 2px 8px rgba(0,0,0,.4);
+    }
+    label {
+      display: block;
+      font-size: 0.85rem;
+      color: #a0aec0;
+      margin-bottom: 0.4rem;
+      font-weight: 600;
+    }
+    input[type="text"] {
+      width: 100%;
+      padding: .5rem .75rem;
+      border: 2px solid #4a5568;
+      border-radius: 6px;
+      background: #1a202c;
+      color: #e2e8f0;
+      font-size: 1rem;
+      box-sizing: border-box;
+    }
+    input[type="text"]:focus { outline: none; border-color: #63b3ed; }
+    .color-row {
+      display: flex;
+      align-items: center;
+      gap: .75rem;
+      margin-top: 1rem;
+    }
+    input[type="color"] {
+      width: 48px; height: 36px;
+      border: none; background: none; cursor: pointer;
+    }
+    .hint {
+      margin-top: 1.25rem;
+      font-size: .8rem;
+      color: #718096;
+      line-height: 1.6;
+    }
+    code { color: #90cdf4; }
+  </style>
+</head>
+<body>
+  <h2>Control Panel</h2>
+  <div class="card">
+    <label>Type to update main window:</label>
+    <input id="txtInput" type="text" placeholder="Start typing…" autofocus />
+
+    <div class="color-row">
+      <label style="margin-bottom:0">Text color:</label>
+      <input id="colorInput" type="color" value="#000000" />
+      <span id="colorLabel">#000000</span>
+    </div>
+
+    <p class="hint">
+      Communicates with the Angular main window via
+      <code>window.postMessage()</code>.
+      This is the cross-window pattern equivalent of the
+      <code>html-popup</code> POC, wired into an Angular service.
+    </p>
+  </div>
+
+  <script>
+    // In production, replace TARGET_ORIGIN with the exact origin of the Angular app,
+    // e.g. 'http://localhost:4200'. This POC uses '*' (any origin) for local dev convenience.
+    var TARGET_ORIGIN = '*';
+
+    var txtInput = document.getElementById('txtInput');
+    var colorInput = document.getElementById('colorInput');
+    var colorLabel = document.getElementById('colorLabel');
+
+    txtInput.addEventListener('input', function () {
+      if (window.opener && !window.opener.closed) {
+        window.opener.postMessage({ type: 'UPDATE_TEXT', value: txtInput.value }, TARGET_ORIGIN);
+      }
+    });
+
+    colorInput.addEventListener('input', function () {
+      colorLabel.textContent = colorInput.value;
+      if (window.opener && !window.opener.closed) {
+        window.opener.postMessage({ type: 'UPDATE_COLOR', value: colorInput.value }, TARGET_ORIGIN);
+      }
+    });
+
+    window.addEventListener('beforeunload', function () {
+      if (window.opener && !window.opener.closed) {
+        window.opener.postMessage({ type: 'POPUP_CLOSED' }, TARGET_ORIGIN);
+      }
+    });
+  </script>
+</body>
+</html>

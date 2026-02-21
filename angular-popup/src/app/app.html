@@ -1,0 +1,64 @@
+<mat-toolbar color="primary">
+  <span>Angular Popup POC</span>
+  <span style="flex: 1"></span>
+  <button mat-icon-button (click)="sidenav.toggle()" aria-label="Toggle side panel">
+    <mat-icon>menu</mat-icon>
+  </button>
+</mat-toolbar>
+
+<mat-sidenav-container style="height: calc(100vh - 64px)">
+
+  <!-- ① Same-page side panel (Angular Material mat-sidenav) -->
+  <mat-sidenav #sidenav mode="over" position="end" style="width: 300px; padding: 1rem">
+    <h3 style="margin-top: 0">In-page Control Panel</h3>
+    <p style="font-size: 0.85rem; color: #555">
+      This is the Angular Material <code>mat-sidenav</code> approach — a drawer
+      that slides in from the side <em>within the same browser window</em>.
+    </p>
+
+    <mat-form-field appearance="outline" style="width: 100%">
+      <mat-label>Type to update main view</mat-label>
+      <input matInput #sideInput (input)="popup.text.set(sideInput.value)" />
+    </mat-form-field>
+
+    <div style="display: flex; align-items: center; gap: 0.5rem; margin-top: 0.5rem">
+      <label>Text color:</label>
+      <input type="color" [value]="popup.color()"
+             (input)="popup.color.set($any($event.target).value)" />
+    </div>
+  </mat-sidenav>
+
+  <!-- Main content area -->
+  <mat-sidenav-content style="padding: 2rem">
+    <h2>Main Content</h2>
+
+    <!-- Controlled value display -->
+    <mat-form-field appearance="outline" style="width: 100%; max-width: 480px">
+      <mat-label>Controlled text</mat-label>
+      <input matInput [value]="popup.text()" [style.color]="popup.color()" readonly
+             placeholder="Open a panel and type something…" />
+    </mat-form-field>
+
+    <p style="color: #555; font-size: 0.9rem">
+      Use either the <strong>in-page sidenav</strong> (menu icon ↗) or the
+      <strong>popup window</strong> (button below) to control this field.
+    </p>
+
+    <!-- ② Cross-window popup (postMessage) -->
+    <div style="display: flex; gap: 0.75rem; margin-top: 1rem">
+      <button mat-raised-button color="primary"
+              (click)="openPopup()" [disabled]="popup.isOpen()">
+        <mat-icon>open_in_new</mat-icon> Open Popup Control Panel
+      </button>
+      <button mat-raised-button color="warn"
+              (click)="closePopup()" [disabled]="!popup.isOpen()">
+        <mat-icon>close</mat-icon> Close Popup
+      </button>
+    </div>
+
+    <p style="margin-top: 0.75rem; font-size: 0.8rem; color: #888">
+      Popup status: <strong>{{ popup.isOpen() ? 'open' : 'closed' }}</strong>
+    </p>
+  </mat-sidenav-content>
+
+</mat-sidenav-container>
