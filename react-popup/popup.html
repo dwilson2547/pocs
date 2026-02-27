@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>React Popup – Control Panel</title>
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <style>
+    body { font-family: sans-serif; padding: 1.5rem; background: #2d3748; color: #e2e8f0; }
+    h2 { color: #90cdf4; margin-bottom: 1.25rem; }
+    .card {
+      background: #3d4f6e; border-radius: 8px; padding: 1.25rem;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+    }
+    label { display: block; margin-bottom: 0.4rem; font-weight: 600; font-size: 0.9rem; color: #a0aec0; }
+    input[type="text"] {
+      width: 100%; padding: 0.5rem 0.75rem; border: 2px solid #4a5568;
+      border-radius: 6px; font-size: 1rem; background: #2d3748; color: #e2e8f0;
+      box-sizing: border-box;
+    }
+    input[type="text"]:focus { outline: none; border-color: #667eea; }
+    .color-row { display: flex; align-items: center; gap: 0.75rem; margin-top: 1rem; }
+    input[type="color"] { width: 48px; height: 36px; border: none; background: none; cursor: pointer; }
+    .color-label { font-size: 0.9rem; color: #a0aec0; }
+    .hint { margin-top: 1.25rem; font-size: 0.8rem; color: #718096; line-height: 1.5; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useCallback } = React;
+
+    function ControlPanel() {
+      const [text, setText] = useState('');
+      const [color, setColor] = useState('#000000');
+
+      // Notify parent window to close popup before unloading
+      // In production, replace '*' with the exact origin of the parent window.
+      // This POC uses '*' because both pages run on the same local development server.
+      const TARGET_ORIGIN = '*';
+
+      useEffect(() => {
+        function handleUnload() {
+          if (window.opener && !window.opener.closed) {
+            window.opener.postMessage({ type: 'POPUP_CLOSED' }, TARGET_ORIGIN);
+          }
+        }
+        window.addEventListener('beforeunload', handleUnload);
+        return () => window.removeEventListener('beforeunload', handleUnload);
+      }, []);
+
+      const sendText = useCallback((value) => {
+        setText(value);
+        if (window.opener && !window.opener.closed) {
+          window.opener.postMessage({ type: 'UPDATE_TEXT', value }, TARGET_ORIGIN);
+        }
+      }, []);
+
+      const sendColor = useCallback((value) => {
+        setColor(value);
+        if (window.opener && !window.opener.closed) {
+          window.opener.postMessage({ type: 'UPDATE_COLOR', value }, TARGET_ORIGIN);
+        }
+      }, []);
+
+      return (
+        <div>
+          <h2>Control Panel</h2>
+          <div className="card">
+            <label>Type to update main window:</label>
+            <input
+              type="text"
+              value={text}
+              onChange={e => sendText(e.target.value)}
+              placeholder="Start typing…"
+              autoFocus
+            />
+
+            <div className="color-row">
+              <label className="color-label">Text color:</label>
+              <input
+                type="color"
+                value={color}
+                onChange={e => sendColor(e.target.value)}
+              />
+              <span className="color-label">{color}</span>
+            </div>
+
+            <p className="hint">
+              This window communicates with the main window using
+              <code> window.postMessage()</code>.
+              Changes here update the main window in real time.
+            </p>
+          </div>
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<ControlPanel />);
+  </script>
+</body>
+</html>
